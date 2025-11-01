@@ -1,42 +1,88 @@
-# AI Book Agent
+# JosefGPT Local
 
-This repository contains a simple FastAPI web service that exposes endpoints for asking questions to a (future) AI-powered book agent.
+Local-first knowledge retrieval and coaching assistant built around hybrid retrieval with OpenAI reasoning.
 
-## Overview
+## Features
+- Chunk and embed PDFs, EPUBs, Markdown, and text files from `books/`, `texts/`, or `data/` directories.
+- Streamlit UI with chat history, configurable retrieval/generation settings, and source previews.
+- Typer-based CLI for ingestion, terminal chat, and launching the UI.
+- Flexible configuration through `.env` without touching code, including an offline heuristic fallback when an OpenAI key is missing.
 
-The service exposes two HTTP endpoints:
-- `GET /ask`: Takes a query parameter `q` with the user's question and returns a JSON object containing the original query and the answer. Currently, it delegates to a placeholder `ask_agent` function defined in `agent_retriever_http_fix.py`. This function simply returns a default message because the agent implementation has not been completed.
-- `GET /health`: Returns a simple JSON object to confirm the service is running.
-
-There are also placeholders for ingesting data into the agent (`agent_ingest_index.py`) and retrieving answers via a more robust retriever. These modules are currently stubs and can be extended.
-
-## Setup
-
-1. Clone this repository:
+## Quickstart
+1. **Install dependencies**
    ```bash
-   git clone https://github.com/Stealth-mode-OFF/ai-book-agent.git
-   cd ai-book-agent
-   ```
-2. Install the dependencies:
-   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
-3. Run the FastAPI server using uvicorn:
+2. **Configure environment**
+   - Copy `.env.example` to `.env` and add your `OPENAI_API_KEY`.
+3. **Add knowledge sources**
+   - Drop PDFs, EPUBs, Markdown, or text files into `books/`, `texts/`, or `data/`.
+4. **Ingest embeddings**
    ```bash
-   uvicorn main:app --host 0.0.0.0 --port 10000
+   python -m app.cli ingest
+   ```
+5. **Launch the UI**
+   ```bash
+   streamlit run app/ui.py
    ```
 
-## Environment Variables
+## CLI Commands
+Run `python -m app.cli --help` for the full menu.
 
-The service is designed to work with external APIs and databases in the future. Environment variables are used to store sensitive configuration such as API keys and URLs. Do **not** hard code API keys in source files. Configure the following variables when deploying:
+- `python -m app.cli ingest`  
+  Rebuilds the Chroma database. Use `-s path/to/dir` to ingest custom folders.
 
-- `OPENAI_API_KEY`: Your OpenAI API key. This key should be provided in your deployment environment or secret manager. **Never commit your API keys to the repository.**
-- `WEAVIATE_URL`: The URL of your Weaviate instance if you plan to use vector storage. In the provided `render.yaml` example, this is set to a placeholder value.
+- `python -m app.cli chat`  
+  Starts an interactive terminal chat. Flags such as `--top-k`, `--temperature`, and `--max-tokens` override defaults, and `--hide-sources` suppresses source summaries.
 
-## Development Notes
+- `python -m app.cli serve`  
+  Convenience wrapper around `streamlit run app/ui.py`.
 
-- `agent_ingest_index.py`: Contains a TODO for implementing ingestion of documents or data into the agent's index.
-- `agent_retriever_http_fix.py`: Provides the `ask_agent` function used by the `/ask` endpoint. Replace the default return value with your logic for querying your agent.
-- `render.yaml`: Deployment configuration for Render.com. You can modify this file to match your hosting environment.
+## Streamlit UI
+- Adjust retrieval/generation parameters from the sidebar; settings persist during the session.
+- Every reply lists supporting source excerpts with similarity scores and chunk identifiers for quick verification.
 
-Feel free to extend the repository by implementing the ingestion and retrieval logic, integrating with vector databases like Weaviate, or connecting to language models such as OpenAI's GPT. Remember to keep secrets in environment variables or secret management systems.
+## Configuration
+Environment variables (see `.env.example`):
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `OPENAI_MODEL` | Chat completion model. | `gpt-5-turbo` |
+| `USE_OPENAI_EMBEDDINGS` | Switch between OpenAI and local SentenceTransformer embeddings. | `false` |
+| `EMBEDDING_MODEL` | OpenAI embedding model name. | `text-embedding-3-large` |
+| `TOP_K` | Default retrieved chunks per query. | `6` |
+| `MAX_TOKENS` | Default completion max tokens. | `900` |
+| `TEMPERATURE` | Default completion temperature. | `0.3` |
+| `EMBEDDINGS_PATH` | Location for the ChromaDB store. | `embeddings/` |
+| `SOURCE_DIRS` | Comma-separated list of directories to scan. | `books,texts,data` |
+| `LLM_MODE` | `openai`, `offline`, or `auto` (fallback to offline when no key). | `auto` |
+
+## Development & Testing
+- Format/compile checks:
+  ```bash
+  python3 -m py_compile ingest_books.py app/*.py
+  ```
+- Run the automated test suite (once added in `tests/`):
+  ```bash
+  pytest
+  ```
+- Clean embeddings/data quickly by removing the `embeddings/` directory (listed in `.gitignore`).
+
+## Project Layout
+```
+
+## Offline Mode
+- Set `LLM_MODE=offline` (or omit an `OPENAI_API_KEY`) to run without external API calls.
+- In offline mode, JosefGPT synthesises heuristic guidance from retrieved context; UI and CLI clearly flag this mode.
+.
+├── app/
+│   ├── cli.py          # Typer CLI
+│   ├── config.py       # Central configuration
+│   ├── query_engine.py # Retrieval + LLM orchestration
+│   └── ui.py           # Streamlit interface
+├── ingest_books.py     # Ingestion pipeline (shared with CLI)
+├── requirements.txt
+└── README.md
+```
